@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">CAMERA2</string>
+    <string name="take_picture">PICTURE</string>
+    <string name="switch_camera">SWITCH</string>
+</resources>
