@@ -2,6 +2,7 @@ package com.example.ezequiel.camera2.others;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
@@ -22,6 +23,7 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.SystemClock;
@@ -57,40 +59,33 @@ import java.util.concurrent.TimeUnit;
  * Created by Ezequiel Adrian on 24/02/2017.
  */
 
+@TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class Camera2Source {
     public static final int CAMERA_FACING_BACK = 0;
     public static final int CAMERA_FACING_FRONT = 1;
     private int mFacing = CAMERA_FACING_BACK;
+
+    public static final int CAMERA_FLASH_OFF = CaptureRequest.CONTROL_AE_MODE_OFF;
+    public static final int CAMERA_FLASH_ON = CaptureRequest.CONTROL_AE_MODE_ON;
+    public static final int CAMERA_FLASH_AUTO = CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH;
+    public static final int CAMERA_FLASH_ALWAYS = CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH;
+    public static final int CAMERA_FLASH_REDEYE = CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH_REDEYE;
+    private int mFlashMode = CAMERA_FLASH_AUTO;
+
+    public static final int CAMERA_AF_AUTO = CaptureRequest.CONTROL_AF_MODE_AUTO;
+    public static final int CAMERA_AF_EDOF = CaptureRequest.CONTROL_AF_MODE_EDOF;
+    public static final int CAMERA_AF_MACRO = CaptureRequest.CONTROL_AF_MODE_MACRO;
+    public static final int CAMERA_AF_OFF = CaptureRequest.CONTROL_AF_MODE_OFF;
+    public static final int CAMERA_AF_CONTINUOUS_PICTURE = CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE;
+    public static final int CAMERA_AF_CONTINUOUS_VIDEO = CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO;
+    private int mFocusMode = CAMERA_AF_AUTO;
+
     private static final String TAG = "Camera2Source";
     private static final double maxRatioTolerance = 0.1;
     private Context mContext;
     private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
     private boolean cameraStarted = false;
     private int mSensorOrientation;
-
-    @IntDef({
-            CaptureRequest.CONTROL_AE_MODE_OFF,
-            CaptureRequest.CONTROL_AE_MODE_ON,
-            CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH,
-            CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH,
-            CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH_REDEYE
-    })
-    @Retention(RetentionPolicy.SOURCE)
-    private @interface FlashMode {}
-
-    @IntDef({
-            CaptureRequest.CONTROL_AF_MODE_AUTO,
-            CaptureRequest.CONTROL_AF_MODE_EDOF,
-            CaptureRequest.CONTROL_AF_MODE_MACRO,
-            CaptureRequest.CONTROL_AF_MODE_OFF,
-            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE,
-            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_VIDEO
-    })
-    @Retention(RetentionPolicy.SOURCE)
-    private @interface FocusMode {}
-
-    private int mFlashMode = CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH;
-    private int mFocusMode = CaptureRequest.CONTROL_AF_MODE_AUTO;
 
     /**
      * A reference to the opened {@link CameraDevice}.
@@ -182,6 +177,8 @@ public class Camera2Source {
     private AutoFitTextureView mTextureView;
 
     private ShutterCallback mShutterCallback;
+
+    private CameraManager manager = null;
 
     static {
         ORIENTATIONS.append(Surface.ROTATION_0, 90);
@@ -358,12 +355,12 @@ public class Camera2Source {
             mCameraSource.mContext = context;
         }
 
-        public Builder setFocusMode(@FocusMode int mode) {
+        public Builder setFocusMode(int mode) {
             mCameraSource.mFocusMode = mode;
             return this;
         }
 
-        public Builder setFlashMode(@FlashMode int mode) {
+        public Builder setFlashMode(int mode) {
             mCameraSource.mFlashMode = mode;
             return this;
         }
@@ -500,7 +497,20 @@ public class Camera2Source {
         } finally {
             mCameraOpenCloseLock.release();
             stopBackgroundThread();
+            Log.d("ASD", "FINISHED CLOSING CAMERA2");
         }
+    }
+
+    public boolean isCamera2Native() {
+        try {
+            if (ContextCompat.checkSelfPermission(mContext, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {return false;}
+            manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
+            mCameraId = manager.getCameraIdList()[mFacing];
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(mCameraId);
+            //CHECK CAMERA HARDWARE LEVEL. IF CAMERA2 IS NOT NATIVELY SUPPORTED, GO BACK TO CAMERA1
+            int deviceLevel = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
+            return (deviceLevel != CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY);
+        } catch (CameraAccessException ex) {return false;}
     }
 
     /**
@@ -656,21 +666,7 @@ public class Camera2Source {
     }
 
     private void openCamera(int width, int height) {
-        if (ContextCompat.checkSelfPermission(mContext, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            setUpCameraOutputs(width, height);
-            configureTransform(width, height);
-            CameraManager manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
-            try {
-                if (!mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
-                    throw new RuntimeException("Time out waiting to lock camera opening.");
-                }
-                manager.openCamera(mCameraId, mStateCallback, mBackgroundHandler);
-            } catch (CameraAccessException e) {
-                e.printStackTrace();
-            } catch (InterruptedException e) {
-                throw new RuntimeException("Interrupted while trying to lock camera opening.", e);
-            }
-        }
+        setUpCameraOutputs(width, height);
     }
 
     /**
@@ -712,10 +708,14 @@ public class Camera2Source {
      * @param height The height of available size for camera preview
      */
     private void setUpCameraOutputs(int width, int height) {
-        CameraManager manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
         try {
-            String cameraId = manager.getCameraIdList()[mFacing];
-            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+            if (ContextCompat.checkSelfPermission(mContext, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {return;}
+            if (!mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
+                throw new RuntimeException("Time out waiting to lock camera opening.");
+            }
+            if(manager == null) manager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
+            mCameraId = manager.getCameraIdList()[mFacing];
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(mCameraId);
             StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
             if (map == null) {return;}
 
@@ -786,9 +786,13 @@ public class Camera2Source {
             Boolean available = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
             mFlashSupported = available == null ? false : available;
 
-            mCameraId = cameraId;
+            configureTransform(width, height);
+
+            manager.openCamera(mCameraId, mStateCallback, mBackgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Interrupted while trying to lock camera opening.", e);
         } catch (NullPointerException e) {
             // Currently an NPE is thrown when the Camera2API is used but not supported on the
             // device this code runs.

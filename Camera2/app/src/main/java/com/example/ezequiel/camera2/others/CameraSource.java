@@ -91,7 +91,8 @@ public class CameraSource {
     public static final int CAMERA_FACING_FRONT = CameraInfo.CAMERA_FACING_FRONT;
 
     private static final String TAG = "CameraSource";
-    private static final double maxRatioTolerance = 0.1;
+    private static final double ratioTolerance = 0.1;
+    private static final double maxRatioTolerance = 0.15;
 
     @StringDef({
             Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE,
@@ -413,6 +414,7 @@ public class CameraSource {
                 mProcessingThread.start();
 
             } catch (RuntimeException e) {
+                e.printStackTrace();
                 Toast.makeText(mContext, e.getMessage(), Toast.LENGTH_LONG).show();
                 return null;
             }
@@ -546,6 +548,7 @@ public class CameraSource {
      * @param jpeg    the callback for JPEG image data, or null
      */
     public void takePicture(ShutterCallback shutter, PictureCallback jpeg) {
+        Log.d("ASD", "TRYING TO TAKE PICTURE");
         synchronized (mCameraLock) {
             if (mCamera != null) {
                 setFlashMode(mFlashMode);
@@ -939,7 +942,7 @@ public class CameraSource {
         for (Camera.Size size : supportedPictureSizes) {
             float ratio = (float)size.width / size.height;
             double diff = Math.abs(ratio - targetRatio);
-            if (diff < maxRatioTolerance){
+            if (diff < ratioTolerance){
                 if (diffs.keySet().contains(diff)){
                     //add the value to the list
                     diffs.get(diff).add(size);
@@ -947,6 +950,23 @@ public class CameraSource {
                     List newList = new ArrayList<>();
                     newList.add(size);
                     diffs.put(diff, newList);
+                }
+            }
+        }
+
+        if(diffs.isEmpty()) {
+            for (Camera.Size size : supportedPictureSizes) {
+                float ratio = (float)size.width / size.height;
+                double diff = Math.abs(ratio - targetRatio);
+                if (diff < maxRatioTolerance){
+                    if (diffs.keySet().contains(diff)){
+                        //add the value to the list
+                        diffs.get(diff).add(size);
+                    } else {
+                        List newList = new ArrayList<>();
+                        newList.add(size);
+                        diffs.put(diff, newList);
+                    }
                 }
             }
         }
@@ -963,6 +983,7 @@ public class CameraSource {
                 }
             }
         }
+        if(bestSize == null) return supportedPictureSizes.get(0);
         return bestSize;
     }
 
@@ -976,7 +997,7 @@ public class CameraSource {
         for (Camera.Size size : supportedPreviewSizes) {
             float ratio = (float)size.width / size.height;
             double diff = Math.abs(ratio - targetRatio);
-            if (diff < maxRatioTolerance){
+            if (diff < ratioTolerance){
                 if (diffs.keySet().contains(diff)){
                     //add the value to the list
                     diffs.get(diff).add(size);
@@ -988,12 +1009,29 @@ public class CameraSource {
             }
         }
 
+        if(diffs.isEmpty()) {
+            for (Camera.Size size : supportedPreviewSizes) {
+                float ratio = (float)size.width / size.height;
+                double diff = Math.abs(ratio - targetRatio);
+                if (diff < maxRatioTolerance){
+                    if (diffs.keySet().contains(diff)){
+                        //add the value to the list
+                        diffs.get(diff).add(size);
+                    } else {
+                        List newList = new ArrayList<>();
+                        newList.add(size);
+                        diffs.put(diff, newList);
+                    }
+                }
+            }
+        }
+
         //diffs now contains all of the usable sizes
         //now let's see which one has the least amount of
         for (Map.Entry entry: diffs.entrySet()){
             List<Camera.Size> entries = (List)entry.getValue();
             for (Camera.Size s: entries) {
-                if(s.height < 1080 && s.width < 1920) {
+                if(s.height <= 1080 && s.width <= 1920) {
                     if(bestSize == null) {
                         bestSize = s;
                     } else if(bestSize.width < s.width || bestSize.height < s.height) {
@@ -1002,6 +1040,7 @@ public class CameraSource {
                 }
             }
         }
+        if(bestSize == null) return supportedPreviewSizes.get(0);
         return bestSize;
     }
 
@@ -1241,6 +1280,7 @@ public class CameraSource {
                     //REDUCE SIZE OF CAMERA PREVIEW
                     int previewW = mPreviewSize.getWidth();
                     int previewH = mPreviewSize.getHeight();
+                    Log.d("ASD", "FRAME SIZE: "+previewW+"x"+previewH);
                     outputFrame = new Frame.Builder()
                             .setImageData(quarterNV21(mPendingFrameData, previewW, previewH), previewW/4, previewH/4, ImageFormat.NV21)
                             .setId(mPendingFrameId)

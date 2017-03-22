@@ -1,12 +1,13 @@
 package com.example.ezequiel.camera2;
 
 import android.Manifest;
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.hardware.camera2.CaptureRequest;
 import android.media.Image;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.annotation.NonNull;
@@ -17,9 +18,13 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.ezequiel.camera2.others.Camera2Source;
+import com.example.ezequiel.camera2.others.FaceGraphic;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.vision.MultiProcessor;
 import com.google.android.gms.vision.Tracker;
 import com.google.android.gms.vision.face.Face;
@@ -39,16 +44,17 @@ public class MainActivity extends AppCompatActivity {
     private Context context;
     private static final int REQUEST_CAMERA_PERMISSION = 200;
     private static final int REQUEST_STORAGE_PERMISSION = 201;
+    private TextView cameraVersion;
 
     // CAMERA VERSION ONE DECLARATIONS
-    private CameraSource mCameraSource;
+    private CameraSource mCameraSource = null;
 
     // CAMERA VERSION TWO DECLARATIONS
-    private Camera2Source mCamera2Source;
+    private Camera2Source mCamera2Source = null;
 
     // COMMON TO BOTH CAMERAS
     private CameraSourcePreview mPreview;
-    private FaceDetector previewFaceDetector;
+    private FaceDetector previewFaceDetector = null;
     private GraphicOverlay mGraphicOverlay;
     private FaceGraphic mFaceGraphic;
     private boolean wasActivityResumed = false;
@@ -56,8 +62,9 @@ public class MainActivity extends AppCompatActivity {
     // DEFAULT CAMERA BEING OPENED
     private boolean usingFrontCamera = true;
 
-    // YOU CAN CHECK FOR ANDROID API LEVEL 21+ FOR ENABLING CAMERA2 AUTOMATICALLY
-    private boolean useCamera2 = true;
+    // MUST BE CAREFUL USING THIS VARIABLE.
+    // ANY ATTEMPT TO START CAMERA2 ON API < 21 WILL CRASH.
+    private boolean useCamera2 = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,34 +77,37 @@ public class MainActivity extends AppCompatActivity {
         Button switchButton = (Button) findViewById(R.id.btn_switch);
         mPreview = (CameraSourcePreview) findViewById(R.id.preview);
         mGraphicOverlay = (GraphicOverlay) findViewById(R.id.faceOverlay);
+        cameraVersion = (TextView) findViewById(R.id.cameraVersion);
 
-        requestPermissionThenOpenCamera();
+        if(checkGooglePlayAvailability()) {
+            requestPermissionThenOpenCamera();
 
-        switchButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(usingFrontCamera) {
-                    stopCameraSource();
-                    createCameraSourceBack();
-                    usingFrontCamera = false;
-                } else {
-                    stopCameraSource();
-                    createCameraSourceFront();
-                    usingFrontCamera = true;
+            switchButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if(usingFrontCamera) {
+                        stopCameraSource();
+                        createCameraSourceBack();
+                        usingFrontCamera = false;
+                    } else {
+                        stopCameraSource();
+                        createCameraSourceFront();
+                        usingFrontCamera = true;
+                    }
                 }
-            }
-        });
+            });
 
-        takePictureButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(useCamera2) {
-                    mCamera2Source.takePicture(camera2SourceShutterCallback, camera2SourcePictureCallback);
-                } else {
-                    mCameraSource.takePicture(cameraSourceShutterCallback, cameraSourcePictureCallback);
+            takePictureButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if(useCamera2) {
+                        if(mCamera2Source != null)mCamera2Source.takePicture(camera2SourceShutterCallback, camera2SourcePictureCallback);
+                    } else {
+                        if(mCameraSource != null)mCameraSource.takePicture(cameraSourceShutterCallback, cameraSourcePictureCallback);
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     final CameraSource.ShutterCallback cameraSourceShutterCallback = new CameraSource.ShutterCallback() {@Override public void onShutter() {Log.d(TAG, "Shutter Callback!");}};
@@ -124,10 +134,13 @@ public class MainActivity extends AppCompatActivity {
     };
 
     final Camera2Source.ShutterCallback camera2SourceShutterCallback = new Camera2Source.ShutterCallback() {
+        @TargetApi(Build.VERSION_CODES.LOLLIPOP)
         @Override
-        public void onShutter() {Log.d("ASD", "Shutter Callback for CAMERA2");}
+        public void onShutter() {Log.d(TAG, "Shutter Callback for CAMERA2");}
     };
+
     final Camera2Source.PictureCallback camera2SourcePictureCallback = new Camera2Source.PictureCallback() {
+        @TargetApi(Build.VERSION_CODES.LOLLIPOP)
         @Override
         public void onPictureTaken(Image image) {
             Log.d(TAG, "Taken picture is here!");
@@ -153,9 +166,23 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
+    private boolean checkGooglePlayAvailability() {
+        GoogleApiAvailability googleApiAvailability = GoogleApiAvailability.getInstance();
+        int resultCode = googleApiAvailability.isGooglePlayServicesAvailable(context);
+        if(resultCode == ConnectionResult.SUCCESS) {
+            return true;
+        } else {
+            if(googleApiAvailability.isUserResolvableError(resultCode)) {
+                googleApiAvailability.getErrorDialog(MainActivity.this, resultCode, 2404).show();
+            }
+        }
+        return false;
+    }
+
     private void requestPermissionThenOpenCamera() {
         if(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                useCamera2 = (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP);
                 createCameraSourceFront();
             } else {
                 ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_STORAGE_PERMISSION);
@@ -174,19 +201,27 @@ public class MainActivity extends AppCompatActivity {
                 .setTrackingEnabled(true)
                 .build();
 
-        previewFaceDetector.setProcessor(new MultiProcessor.Builder<>(new GraphicFaceTrackerFactory()).build());
-
-        if(!previewFaceDetector.isOperational()) {
+        if(previewFaceDetector.isOperational()) {
+            previewFaceDetector.setProcessor(new MultiProcessor.Builder<>(new GraphicFaceTrackerFactory()).build());
+        } else {
             Toast.makeText(context, "FACE DETECTION NOT AVAILABLE", Toast.LENGTH_SHORT).show();
         }
 
         if(useCamera2) {
             mCamera2Source = new Camera2Source.Builder(context, previewFaceDetector)
-                    .setFlashMode(CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH)
+                    .setFocusMode(Camera2Source.CAMERA_AF_AUTO)
+                    .setFlashMode(Camera2Source.CAMERA_FLASH_AUTO)
                     .setFacing(Camera2Source.CAMERA_FACING_FRONT)
                     .build();
 
-            startCameraSource();
+            //IF CAMERA2 HARDWARE LEVEL IS LEGACY, CAMERA2 IS NOT NATIVE.
+            //WE WILL USE CAMERA1.
+            if(mCamera2Source.isCamera2Native()) {
+                startCameraSource();
+            } else {
+                useCamera2 = false;
+                if(usingFrontCamera) createCameraSourceFront(); else createCameraSourceBack();
+            }
         } else {
             mCameraSource = new CameraSource.Builder(context, previewFaceDetector)
                     .setFacing(CameraSource.CAMERA_FACING_FRONT)
@@ -206,19 +241,27 @@ public class MainActivity extends AppCompatActivity {
                 .setTrackingEnabled(true)
                 .build();
 
-        previewFaceDetector.setProcessor(new MultiProcessor.Builder<>(new GraphicFaceTrackerFactory()).build());
-
-        if(!previewFaceDetector.isOperational()) {
+        if(previewFaceDetector.isOperational()) {
+            previewFaceDetector.setProcessor(new MultiProcessor.Builder<>(new GraphicFaceTrackerFactory()).build());
+        } else {
             Toast.makeText(context, "FACE DETECTION NOT AVAILABLE", Toast.LENGTH_SHORT).show();
         }
 
         if(useCamera2) {
             mCamera2Source = new Camera2Source.Builder(context, previewFaceDetector)
-                    .setFlashMode(CaptureRequest.CONTROL_AE_MODE_ON_ALWAYS_FLASH)
+                    .setFocusMode(Camera2Source.CAMERA_AF_AUTO)
+                    .setFlashMode(Camera2Source.CAMERA_FLASH_AUTO)
                     .setFacing(Camera2Source.CAMERA_FACING_BACK)
                     .build();
 
-            startCameraSource();
+            //IF CAMERA2 HARDWARE LEVEL IS LEGACY, CAMERA2 IS NOT NATIVE.
+            //WE WILL USE CAMERA1.
+            if(mCamera2Source.isCamera2Native()) {
+                startCameraSource();
+            } else {
+                useCamera2 = false;
+                if(usingFrontCamera) createCameraSourceFront(); else createCameraSourceBack();
+            }
         } else {
             mCameraSource = new CameraSource.Builder(context, previewFaceDetector)
                     .setFacing(CameraSource.CAMERA_FACING_BACK)
@@ -232,6 +275,7 @@ public class MainActivity extends AppCompatActivity {
     private void startCameraSource() {
         if(useCamera2) {
             if(mCamera2Source != null) {
+                cameraVersion.setText("Camera 2");
                 try {mPreview.start(mCamera2Source, mGraphicOverlay);
                 } catch (IOException e) {
                     Log.e(TAG, "Unable to start camera source 2.", e);
@@ -241,6 +285,7 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             if (mCameraSource != null) {
+                cameraVersion.setText("Camera 1");
                 try {mPreview.start(mCameraSource, mGraphicOverlay);
                 } catch (IOException e) {
                     Log.e(TAG, "Unable to start camera source.", e);
