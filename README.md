@@ -4,10 +4,6 @@ This sample will let you use the basic functionalities of both Camera1 API and C
 You will get all the power of Google Vision Services on your Camera1/Camera2 application.
 You can also switch between Front and Back cameras!
 
-## Usage
-
-To change between Camera1 and Camera2, just change the boolean variable "useCamera2" true or false. Or implement your own method!
-
 ## Pre-requisites
 
 * Android SDK 25 (or higher)
@@ -22,8 +18,11 @@ to acquire rotation info and flip manually with a Matrix.
 ## Tests
 
 Tested and working on:
-* Samsung Galaxy S4
-* LG Nexus 5
+* LG Nexus 5 (API Level: 23)
+* Samsung Galaxy S4 (API Level: 22)
+* Samsung Galaxy S5 Mini (API Level: 23)
+* Motorola G2 XT1072 (API Level: 23)
+* Samsung Galaxy Core (API Level: 18)
 
 Please let me know if you test with success on your devices so I can update this list.
 
