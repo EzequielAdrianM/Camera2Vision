@@ -556,9 +556,12 @@ public class Camera2Source {
             mCameraId = manager.getCameraIdList()[mFacing];
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(mCameraId);
             //CHECK CAMERA HARDWARE LEVEL. IF CAMERA2 IS NOT NATIVELY SUPPORTED, GO BACK TO CAMERA1
-            int deviceLevel = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
-            return (deviceLevel != CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY);
-        } catch (CameraAccessException ex) {return false;}
+            Integer deviceLevel = characteristics.get(CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL);
+            return deviceLevel != null && (deviceLevel != CameraCharacteristics.INFO_SUPPORTED_HARDWARE_LEVEL_LEGACY);
+        }
+        catch (CameraAccessException ex) {return false;}
+        catch (NullPointerException e) {return false;}
+        catch (ArrayIndexOutOfBoundsException ez) {return false;}
     }
 
     /**
