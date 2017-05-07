@@ -39,6 +39,19 @@ public class CameraSourcePreview extends ViewGroup {
     private int screenHeight;
     private int screenRotation;
 
+    public CameraSourcePreview(Context context) {
+        super(context);
+        screenHeight = Utils.getScreenHeight(context);
+        screenWidth = Utils.getScreenWidth(context);
+        screenRotation = Utils.getScreenRotation(context);
+        mStartRequested = false;
+        mSurfaceAvailable = false;
+        mSurfaceView = new SurfaceView(context);
+        mSurfaceView.getHolder().addCallback(mSurfaceViewListener);
+        mAutoFitTextureView = new AutoFitTextureView(context);
+        mAutoFitTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
+    }
+    
     public CameraSourcePreview(Context context, AttributeSet attrs) {
         super(context, attrs);
         screenHeight = Utils.getScreenHeight(context);

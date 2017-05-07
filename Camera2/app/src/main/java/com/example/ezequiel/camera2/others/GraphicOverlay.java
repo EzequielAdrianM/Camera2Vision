@@ -107,6 +107,10 @@ public class GraphicOverlay extends View {
         }
     }
 
+    public GraphicOverlay(Context context) {
+        super(context);
+    }
+
     public GraphicOverlay(Context context, AttributeSet attrs) {
         super(context, attrs);
     }

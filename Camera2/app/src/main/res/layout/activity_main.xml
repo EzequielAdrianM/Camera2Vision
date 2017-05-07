@@ -47,4 +47,12 @@
                 android:background="@android:color/black"/>
         </LinearLayout>
     </LinearLayout>
+
+    <ImageView
+        android:id="@+id/ivAutoFocus"
+        android:contentDescription="@null"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:src="@drawable/btn_autofocus"
+        android:visibility="gone"/>
 </FrameLayout>

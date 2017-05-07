@@ -9,6 +9,7 @@ import android.content.res.Configuration;
 import android.graphics.ImageFormat;
 import android.graphics.Matrix;
 import android.graphics.Point;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -17,9 +18,11 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CameraMetadata;
+import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
+import android.hardware.camera2.params.MeteringRectangle;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
@@ -29,10 +32,12 @@ import android.os.HandlerThread;
 import android.os.SystemClock;
 import android.support.annotation.IntDef;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.annotation.RequiresPermission;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.util.SparseIntArray;
+import android.view.MotionEvent;
 import android.view.Surface;
 
 import com.example.ezequiel.camera2.utils.Utils;
@@ -178,6 +183,11 @@ public class Camera2Source {
 
     private ShutterCallback mShutterCallback;
 
+    private AutoFocusCallback mAutoFocusCallback;
+
+    private Rect sensorArraySize;
+    private boolean isMeteringAreaAFSupported = false;
+
     private CameraManager manager = null;
 
     static {
@@ -274,7 +284,29 @@ public class Camera2Source {
 
         @Override
         public void onCaptureCompleted(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull TotalCaptureResult result) {
-            process(result);
+            if(request.getTag() == ("FOCUS_TAG")) {
+                //The focus trigger is complete!
+                //Resume repeating request, clear AF trigger.
+                mAutoFocusCallback.onAutoFocus(true);
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, null);
+                mPreviewRequestBuilder.setTag("");
+                mPreviewRequest = mPreviewRequestBuilder.build();
+                try {
+                    mCaptureSession.setRepeatingRequest(mPreviewRequest, mCaptureCallback, mBackgroundHandler);
+                } catch(CameraAccessException ex) {
+                    Log.d("ASD", "AUTO FOCUS FAILURE: "+ex);
+                }
+            } else {
+                process(result);
+            }
+        }
+
+        @Override
+        public void onCaptureFailed(@NonNull CameraCaptureSession session, @NonNull CaptureRequest request, @NonNull CaptureFailure failure) {
+            if(request.getTag() == "FOCUS_TAG") {
+                Log.d("ASD", "Manual AF failure: "+failure);
+                mAutoFocusCallback.onAutoFocus(false);
+            }
         }
 
     };
@@ -306,19 +338,19 @@ public class Camera2Source {
      */
     private CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
         @Override
-        public void onOpened(CameraDevice cameraDevice) {
+        public void onOpened(@NonNull CameraDevice cameraDevice) {
             mCameraOpenCloseLock.release();
             mCameraDevice = cameraDevice;
             createCameraPreviewSession();
         }
         @Override
-        public void onDisconnected(CameraDevice cameraDevice) {
+        public void onDisconnected(@NonNull CameraDevice cameraDevice) {
             mCameraOpenCloseLock.release();
             cameraDevice.close();
             mCameraDevice = null;
         }
         @Override
-        public void onError(CameraDevice cameraDevice, int error) {
+        public void onError(@NonNull CameraDevice cameraDevice, int error) {
             mCameraOpenCloseLock.release();
             cameraDevice.close();
             mCameraDevice = null;
@@ -414,7 +446,23 @@ public class Camera2Source {
         void onPictureTaken(Image image);
     }
 
-    // AUTO FOCUS PART HAS BEEN OMITTED FOR SIMPLICITY.
+    /**
+     * Callback interface used to notify on completion of camera auto focus.
+     */
+    public interface AutoFocusCallback {
+        /**
+         * Called when the camera auto focus completes.  If the camera
+         * does not support auto-focus and autoFocus is called,
+         * onAutoFocus will be called immediately with a fake value of
+         * <code>success</code> set to <code>true</code>.
+         * <p/>
+         * The auto-focus routine does not lock auto-exposure and auto-white
+         * balance after it completes.
+         *
+         * @param success true if focus was successful, false if otherwise
+         */
+        void onAutoFocus(boolean success);
+    }
 
     //==============================================================================================
     // Public
@@ -556,6 +604,45 @@ public class Camera2Source {
      */
     public int getCameraFacing() {
         return mFacing;
+    }
+
+    public void autoFocus(@Nullable AutoFocusCallback cb, MotionEvent pEvent, int screenW, int screenH) {
+        if(cb != null) {
+            mAutoFocusCallback = cb;
+        }
+        if(sensorArraySize != null) {
+            final int y = (int)pEvent.getX() / screenW * sensorArraySize.height();
+            final int x = (int)pEvent.getY() / screenH * sensorArraySize.width();
+            final int halfTouchWidth = 150;
+            final int halfTouchHeight = 150;
+            MeteringRectangle focusAreaTouch = new MeteringRectangle(
+                    Math.max(x-halfTouchWidth, 0),
+                    Math.max(y-halfTouchHeight, 0),
+                    halfTouchWidth*2,
+                    halfTouchHeight*2,
+                    MeteringRectangle.METERING_WEIGHT_MAX - 1);
+
+            try {
+                mCaptureSession.stopRepeating();
+                //Cancel any existing AF trigger (repeated touches, etc.)
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF);
+                mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, mBackgroundHandler);
+
+                //Now add a new AF trigger with focus region
+                if(isMeteringAreaAFSupported) {
+                    mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_REGIONS, new MeteringRectangle[]{focusAreaTouch});
+                }
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO);
+                mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
+                mPreviewRequestBuilder.setTag("FOCUS_TAG"); //we'll capture this later for resuming the preview!
+                //Then we ask for a single request (not repeating!)
+                mCaptureSession.capture(mPreviewRequestBuilder.build(), mCaptureCallback, mBackgroundHandler);
+            } catch(CameraAccessException ex) {
+                Log.d("ASD", "AUTO FOCUS EXCEPTION: "+ex);
+            }
+        }
     }
 
     /**
@@ -724,6 +811,11 @@ public class Camera2Source {
             mImageReaderStill = ImageReader.newInstance(largest.getWidth(), largest.getHeight(), ImageFormat.JPEG, /*maxImages*/2);
             mImageReaderStill.setOnImageAvailableListener(mOnImageAvailableListener, mBackgroundHandler);
 
+            sensorArraySize = characteristics.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+            Integer maxAFRegions = characteristics.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF);
+            if(maxAFRegions != null) {
+                isMeteringAreaAFSupported = maxAFRegions >= 1;
+            }
             // Find out if we need to swap dimension to get the preview size relative to sensor
             // coordinate.
             int displayRotation = mDisplayOrientation;

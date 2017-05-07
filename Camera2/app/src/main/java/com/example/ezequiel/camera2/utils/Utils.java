@@ -5,6 +5,7 @@ package com.example.ezequiel.camera2.utils;
  */
 
 import android.content.Context;
+import android.content.res.Resources;
 import android.graphics.Point;
 import android.graphics.PointF;
 import android.util.DisplayMetrics;
@@ -16,6 +17,10 @@ import com.google.android.gms.common.images.Size;
 import java.util.ArrayList;
 
 public class Utils {
+
+    public static int dpToPx(int dp) {
+        return (int) (dp * Resources.getSystem().getDisplayMetrics().density);
+    }
 
     public static int getScreenHeight(Context c) {
         WindowManager wm = (WindowManager) c.getSystemService(Context.WINDOW_SERVICE);

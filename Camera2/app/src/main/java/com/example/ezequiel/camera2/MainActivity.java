@@ -15,14 +15,17 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.ezequiel.camera2.others.Camera2Source;
 import com.example.ezequiel.camera2.others.FaceGraphic;
+import com.example.ezequiel.camera2.utils.Utils;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
 import com.google.android.gms.vision.MultiProcessor;
@@ -45,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_CAMERA_PERMISSION = 200;
     private static final int REQUEST_STORAGE_PERMISSION = 201;
     private TextView cameraVersion;
+    private ImageView ivAutoFocus;
 
     // CAMERA VERSION ONE DECLARATIONS
     private CameraSource mCameraSource = null;
@@ -78,6 +82,7 @@ public class MainActivity extends AppCompatActivity {
         mPreview = (CameraSourcePreview) findViewById(R.id.preview);
         mGraphicOverlay = (GraphicOverlay) findViewById(R.id.faceOverlay);
         cameraVersion = (TextView) findViewById(R.id.cameraVersion);
+        ivAutoFocus = (ImageView) findViewById(R.id.ivAutoFocus);
 
         if(checkGooglePlayAvailability()) {
             requestPermissionThenOpenCamera();
@@ -107,6 +112,8 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             });
+
+            mPreview.setOnTouchListener(CameraPreviewTouchListener);
         }
     }
 
@@ -354,6 +361,49 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private final CameraSourcePreview.OnTouchListener CameraPreviewTouchListener = new CameraSourcePreview.OnTouchListener() {
+        @Override
+        public boolean onTouch(View v, MotionEvent pEvent) {
+            v.onTouchEvent(pEvent);
+            if (pEvent.getAction() == MotionEvent.ACTION_DOWN) {
+                int autoFocusX = (int) (pEvent.getX() - Utils.dpToPx(60)/2);
+                int autoFocusY = (int) (pEvent.getY() - Utils.dpToPx(60)/2);
+                ivAutoFocus.setTranslationX(autoFocusX);
+                ivAutoFocus.setTranslationY(autoFocusY);
+                ivAutoFocus.setVisibility(View.VISIBLE);
+                ivAutoFocus.bringToFront();
+                if(useCamera2) {
+                    if(mCamera2Source != null) {
+                        mCamera2Source.autoFocus(new Camera2Source.AutoFocusCallback() {
+                            @Override
+                            public void onAutoFocus(boolean success) {
+                                runOnUiThread(new Runnable() {
+                                    @Override public void run() {ivAutoFocus.setVisibility(View.GONE);}
+                                });
+                            }
+                        }, pEvent, v.getWidth(), v.getHeight());
+                    } else {
+                        ivAutoFocus.setVisibility(View.GONE);
+                    }
+                } else {
+                    if(mCameraSource != null) {
+                        mCameraSource.autoFocus(new CameraSource.AutoFocusCallback() {
+                            @Override
+                            public void onAutoFocus(boolean success) {
+                                runOnUiThread(new Runnable() {
+                                    @Override public void run() {ivAutoFocus.setVisibility(View.GONE);}
+                                });
+                            }
+                        });
+                    } else {
+                        ivAutoFocus.setVisibility(View.GONE);
+                    }
+                }
+            }
+            return false;
+        }
+    };
+
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
@@ -377,7 +427,16 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         if(wasActivityResumed)
-            startCameraSource();
+        	//If the CAMERA2 is paused then resumed, it won't start again unless creating the whole camera again.
+        	if(useCamera2) {
+        		if(usingFrontCamera) {
+        			createCameraSourceFront();
+        		} else {
+        			createCameraSourceBack();
+        		}
+        	} else {
+        		startCameraSource();
+        	}
     }
 
     @Override
