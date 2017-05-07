@@ -821,25 +821,26 @@ public class Camera2Source {
             }
             // Find out if we need to swap dimension to get the preview size relative to sensor
             // coordinate.
-            int displayRotation = mDisplayOrientation;
-            //noinspection ConstantConditions
-            mSensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
             boolean swappedDimensions = false;
-            switch (displayRotation) {
-                case Surface.ROTATION_0:
-                case Surface.ROTATION_180:
-                    if (mSensorOrientation == 90 || mSensorOrientation == 270) {
-                        swappedDimensions = true;
-                    }
-                    break;
-                case Surface.ROTATION_90:
-                case Surface.ROTATION_270:
-                    if (mSensorOrientation == 0 || mSensorOrientation == 180) {
-                        swappedDimensions = true;
-                    }
-                    break;
-                default:
-                    Log.e(TAG, "Display rotation is invalid: " + displayRotation);
+            Integer sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
+            if(sensorOrientation != null) {
+            	mSensorOrientation = sensorOrientation;
+            	switch (mDisplayOrientation) {
+            	    case Surface.ROTATION_0:
+            	    case Surface.ROTATION_180:
+            	        if (mSensorOrientation == 90 || mSensorOrientation == 270) {
+            	            swappedDimensions = true;
+            	        }
+            	        break;
+            	    case Surface.ROTATION_90:
+            	    case Surface.ROTATION_270:
+            	        if (mSensorOrientation == 0 || mSensorOrientation == 180) {
+            	            swappedDimensions = true;
+            	        }
+            	        break;
+            	    default:
+            	        Log.e(TAG, "Display rotation is invalid: " + mDisplayOrientation);
+            	}
             }
 
             Point displaySize = new Point(Utils.getScreenWidth(mContext), Utils.getScreenHeight(mContext));
