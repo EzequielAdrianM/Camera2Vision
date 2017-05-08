@@ -61,7 +61,12 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Created by Ezequiel Adrian on 24/02/2017.
+ * Camera2Source: Created by Ezequiel Adrian Minniti. Buenos Aires.
+ * 
+ * This work is the evolution of the original CameraSource from GoogleSamples.
+ * Made by ♥ for the community. You are free to use it anywhere.
+ * Just show my name on the credits :)
+ *
  */
 
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
