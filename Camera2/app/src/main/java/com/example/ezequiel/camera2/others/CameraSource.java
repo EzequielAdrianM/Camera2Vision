@@ -34,6 +34,7 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.SystemClock;
 import android.support.annotation.IntDef;
+import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.RequiresPermission;
 import android.support.annotation.StringDef;
@@ -58,6 +59,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -152,9 +154,12 @@ public class CameraSource {
     // select close, but not exactly the same values for these.
     private float mRequestedFps = 30.0f;
 
-    private SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd_HHmmss");
+    private SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault());
     private MediaRecorder mediaRecorder;
     private String videoFile;
+    private VideoStartCallback videoStartCallback;
+    private VideoStopCallback videoStopCallback;
+    private VideoErrorCallback videoErrorCallback;
 
     private String mFocusMode = Camera.Parameters.FOCUS_MODE_AUTO;
     private String mFlashMode = Camera.Parameters.FLASH_MODE_AUTO;
@@ -277,10 +282,18 @@ public class CameraSource {
     }
 
     /**
-     * Callback interface used to indicate when video is recorded
+     * Callback interface used to indicate when video Recording Started.
      */
-    public interface VideoCallback {
-        void onVideoRecorded(boolean success, String path);
+    public interface VideoStartCallback {
+        void onVideoStart();
+    }
+    public interface VideoStopCallback {
+        //Called when Video Recording stopped.
+        void onVideoStop(String videoFile);
+    }
+    public interface VideoErrorCallback {
+        //Called when error ocurred while recording video.
+        void onVideoError(String error);
     }
 
     /**
@@ -561,9 +574,22 @@ public class CameraSource {
         }
     }
 
-    public void recordVideo(final VideoCallback videoCallback) {
-        if(!checkCamera()) {return;}
-        //PREPARE MEDIARECORDER
+    /**
+     * Initiates recording video.
+     *
+     * @param videoStartCallback the callback for video recording start
+     * @param videoStopCallback the callback for video recording stop
+     * @param videoErrorCallback the callback for video recording error
+     */
+    public void recordVideo(@NonNull VideoStartCallback videoStartCallback, @NonNull VideoStopCallback videoStopCallback, @NonNull VideoErrorCallback videoErrorCallback) {
+        this.videoStartCallback = videoStartCallback;
+        this.videoStopCallback = videoStopCallback;
+        this.videoErrorCallback = videoErrorCallback;
+        if(!checkCamera()) {
+            this.videoErrorCallback.onVideoError("Camera Error");
+            return;
+        }
+        //PREPARE MEDIA RECORDER
         int cameraId = getIdForRequestedCamera(mFacing);
         //Step 0. Disable Shutter Sound
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
@@ -583,16 +609,7 @@ public class CameraSource {
         } catch (Exception e) {
             //CAMERA QUALITY TOO LOW!!!!!!!
             releaseMediaRecorder();
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    VideoStartCallback doneCallback = new VideoStartCallback();
-                    doneCallback.mDelegate = videoCallback;
-                    Message msg = new Message();
-                    msg.arg1 = 0;
-                    doneCallback.handleMessage(msg);
-                }
-            }, 100);
+            this.videoErrorCallback.onVideoError("Camera quality too LOW");
             return;
         }
 
@@ -606,7 +623,7 @@ public class CameraSource {
         mediaRecorder.setVideoSize(profile.videoFrameWidth, profile.videoFrameHeight);
 
         //Step 4. Set output file
-        videoFile = Environment.getExternalStorageDirectory() + "/Pictures/FeelingMix/VID_" + formatter.format(new Date()) + ".mp4";
+        videoFile = Environment.getExternalStorageDirectory() + "/" + formatter.format(new Date()) + ".mp4";
         mediaRecorder.setOutputFile(videoFile);
         //Step 5. Set Duration
         mediaRecorder.setMaxDuration(-1);
@@ -614,55 +631,21 @@ public class CameraSource {
             mediaRecorder.prepare();
         } catch (IllegalStateException e) {
             releaseMediaRecorder();
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    VideoStartCallback doneCallback = new VideoStartCallback();
-                    doneCallback.mDelegate = videoCallback;
-                    Message msg = new Message();
-                    msg.arg1 = 0;
-                    doneCallback.handleMessage(msg);
-                }
-            }, 100);
+            this.videoErrorCallback.onVideoError(e.getMessage());
             return;
         } catch (IOException e) {
             releaseMediaRecorder();
-            new Handler().postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    VideoStartCallback doneCallback = new VideoStartCallback();
-                    doneCallback.mDelegate = videoCallback;
-                    Message msg = new Message();
-                    msg.arg1 = 0;
-                    doneCallback.handleMessage(msg);
-                }
-            }, 100);
+            this.videoErrorCallback.onVideoError(e.getMessage());
             return;
         }
-        //SEND RECORD SIGNAL AND WAIT 200ms TO SHOW 'GO!' ANIMATION.
         mediaRecorder.start();
-        new Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                final int videoMaxTimeMs = 2000;
-                new CountDownTimer(videoMaxTimeMs, 100) {
-                    public void onTick(long millisUntilFinished) {}
-                    public void onFinish() {
-                        releaseMediaRecorder();
-                        new Handler().postDelayed(new Runnable() {
-                            @Override
-                            public void run() {
-                                VideoStartCallback doneCallback = new VideoStartCallback();
-                                doneCallback.mDelegate = videoCallback;
-                                Message msg = new Message();
-                                msg.arg1 = 1;
-                                doneCallback.handleMessage(msg);
-                            }
-                        }, 100);
-                    }
-                }.start();
-            }
-        }, 200);
+        //SEND RECORDING SIGNAL!
+        this.videoStartCallback.onVideoStart();
+    }
+
+    public void stopVideo() {
+        releaseMediaRecorder();
+        this.videoStopCallback.onVideoStop(videoFile);
     }
 
     /**
@@ -869,23 +852,6 @@ public class CameraSource {
         }
     }
 
-    private class VideoStartCallback implements Handler.Callback {
-        private VideoCallback mDelegate;
-
-        @Override
-        public boolean handleMessage(Message msg) {
-            if(mDelegate != null) {
-                if(msg.arg1 == 1) {
-                    mDelegate.onVideoRecorded(true, videoFile);
-                }
-                if(msg.arg1 == 0) {
-                    mDelegate.onVideoRecorded(false, videoFile);
-                }
-            }
-            return false;
-        }
-    }
-
     /**
      * Wraps the camera1 auto focus callback so that the deprecated API isn't exposed.
      */
@@ -937,17 +903,17 @@ public class CameraSource {
         List<Camera.Size> supportedPictureSizes = parameters.getSupportedPictureSizes();
         float targetRatio = Utils.getScreenRatio(context);
         Camera.Size bestSize = null;
-        TreeMap<Double, List> diffs = new TreeMap<>();
+        TreeMap<Double, List<Camera.Size>> diffs = new TreeMap<>();
 
         for (Camera.Size size : supportedPictureSizes) {
-            float ratio = (float)size.width / size.height;
+            float ratio = (float) size.width / size.height;
             double diff = Math.abs(ratio - targetRatio);
             if (diff < ratioTolerance){
                 if (diffs.keySet().contains(diff)){
                     //add the value to the list
                     diffs.get(diff).add(size);
                 } else {
-                    List newList = new ArrayList<>();
+                    List<Camera.Size> newList = new ArrayList<>();
                     newList.add(size);
                     diffs.put(diff, newList);
                 }
@@ -963,7 +929,7 @@ public class CameraSource {
                         //add the value to the list
                         diffs.get(diff).add(size);
                     } else {
-                        List newList = new ArrayList<>();
+                        List<Camera.Size> newList = new ArrayList<>();
                         newList.add(size);
                         diffs.put(diff, newList);
                     }
@@ -974,8 +940,9 @@ public class CameraSource {
         //diffs now contains all of the usable sizes
         //now let's see which one has the least amount of
         for (Map.Entry entry: diffs.entrySet()){
-            List<Camera.Size> entries = (List)entry.getValue();
-            for (Camera.Size s: entries) {
+            List<?> entries = (List) entry.getValue();
+            for (int i=0; i<entries.size(); i++) {
+                Camera.Size s = (Camera.Size) entries.get(i);
                 if(bestSize == null) {
                     bestSize = s;
                 } else if(bestSize.width < s.width || bestSize.height < s.height) {
@@ -992,7 +959,7 @@ public class CameraSource {
         List<Camera.Size> supportedPreviewSizes = parameters.getSupportedPreviewSizes();
         float targetRatio = Utils.getScreenRatio(context);
         Camera.Size bestSize = null;
-        TreeMap<Double, List> diffs = new TreeMap<>();
+        TreeMap<Double, List<Camera.Size>> diffs = new TreeMap<>();
 
         for (Camera.Size size : supportedPreviewSizes) {
             float ratio = (float)size.width / size.height;
@@ -1002,7 +969,7 @@ public class CameraSource {
                     //add the value to the list
                     diffs.get(diff).add(size);
                 } else {
-                    List newList = new ArrayList<>();
+                    List<Camera.Size> newList = new ArrayList<>();
                     newList.add(size);
                     diffs.put(diff, newList);
                 }
@@ -1018,7 +985,7 @@ public class CameraSource {
                         //add the value to the list
                         diffs.get(diff).add(size);
                     } else {
-                        List newList = new ArrayList<>();
+                        List<Camera.Size> newList = new ArrayList<>();
                         newList.add(size);
                         diffs.put(diff, newList);
                     }
@@ -1029,8 +996,9 @@ public class CameraSource {
         //diffs now contains all of the usable sizes
         //now let's see which one has the least amount of
         for (Map.Entry entry: diffs.entrySet()){
-            List<Camera.Size> entries = (List)entry.getValue();
-            for (Camera.Size s: entries) {
+            List<?> entries = (List) entry.getValue();
+            for (int i=0; i<entries.size(); i++) {
+                Camera.Size s = (Camera.Size) entries.get(i);
                 if(s.height <= 1080 && s.width <= 1920) {
                     if(bestSize == null) {
                         bestSize = s;
@@ -1280,7 +1248,7 @@ public class CameraSource {
                     //REDUCE SIZE OF CAMERA PREVIEW
                     int previewW = mPreviewSize.getWidth();
                     int previewH = mPreviewSize.getHeight();
-                    Log.d("ASD", "FRAME SIZE: "+previewW+"x"+previewH);
+                    //Log.d("ASD", "FRAME SIZE: "+previewW+"x"+previewH);
                     outputFrame = new Frame.Builder()
                             .setImageData(quarterNV21(mPendingFrameData, previewW, previewH), previewW/4, previewH/4, ImageFormat.NV21)
                             .setId(mPendingFrameId)

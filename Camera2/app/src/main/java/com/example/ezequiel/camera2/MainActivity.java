@@ -62,6 +62,10 @@ public class MainActivity extends AppCompatActivity {
     private GraphicOverlay mGraphicOverlay;
     private FaceGraphic mFaceGraphic;
     private boolean wasActivityResumed = false;
+    private boolean isRecordingVideo = false;
+    private Button takePictureButton;
+    private Button switchButton;
+    private Button videoButton;
 
     // DEFAULT CAMERA BEING OPENED
     private boolean usingFrontCamera = true;
@@ -77,8 +81,9 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         context = getApplicationContext();
 
-        Button takePictureButton = (Button) findViewById(R.id.btn_takepicture);
-        Button switchButton = (Button) findViewById(R.id.btn_switch);
+        takePictureButton = (Button) findViewById(R.id.btn_takepicture);
+        switchButton = (Button) findViewById(R.id.btn_switch);
+        videoButton = (Button) findViewById(R.id.btn_video);
         mPreview = (CameraSourcePreview) findViewById(R.id.preview);
         mGraphicOverlay = (GraphicOverlay) findViewById(R.id.faceOverlay);
         cameraVersion = (TextView) findViewById(R.id.cameraVersion);
@@ -105,10 +110,35 @@ public class MainActivity extends AppCompatActivity {
             takePictureButton.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
+                    switchButton.setEnabled(false);
+                    videoButton.setEnabled(false);
+                    takePictureButton.setEnabled(false);
                     if(useCamera2) {
                         if(mCamera2Source != null)mCamera2Source.takePicture(camera2SourceShutterCallback, camera2SourcePictureCallback);
                     } else {
                         if(mCameraSource != null)mCameraSource.takePicture(cameraSourceShutterCallback, cameraSourcePictureCallback);
+                    }
+                }
+            });
+
+            videoButton.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    switchButton.setEnabled(false);
+                    takePictureButton.setEnabled(false);
+                    videoButton.setEnabled(false);
+                    if(isRecordingVideo) {
+                        if(useCamera2) {
+                            if(mCamera2Source != null)mCamera2Source.stopVideo();
+                        } else {
+                            if(mCameraSource != null)mCameraSource.stopVideo();
+                        }
+                    } else {
+                        if(useCamera2){
+                            if(mCamera2Source != null)mCamera2Source.recordVideo(camera2SourceVideoStartCallback, camera2SourceVideoStopCallback, camera2SourceVideoErrorCallback);
+                        } else {
+                            if(mCameraSource != null)mCameraSource.recordVideo(cameraSourceVideoStartCallback, cameraSourceVideoStopCallback, cameraSourceVideoErrorCallback);
+                        }
                     }
                 }
             });
@@ -122,6 +152,14 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onPictureTaken(Bitmap picture) {
             Log.d(TAG, "Taken picture is here!");
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    switchButton.setEnabled(true);
+                    videoButton.setEnabled(true);
+                    takePictureButton.setEnabled(true);
+                }
+            });
             FileOutputStream out = null;
             try {
                 out = new FileOutputStream(new File(Environment.getExternalStorageDirectory(), "/camera_picture.png"));
@@ -139,6 +177,98 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     };
+    final CameraSource.VideoStartCallback cameraSourceVideoStartCallback = new CameraSource.VideoStartCallback() {
+        @Override
+        public void onVideoStart() {
+            isRecordingVideo = true;
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    videoButton.setEnabled(true);
+                    videoButton.setText(getString(R.string.stop_video));
+                }
+            });
+            Toast.makeText(context, "Video STARTED!", Toast.LENGTH_SHORT).show();
+        }
+    };
+    final CameraSource.VideoStopCallback cameraSourceVideoStopCallback = new CameraSource.VideoStopCallback() {
+        @Override
+        public void onVideoStop(String videoFile) {
+            isRecordingVideo = false;
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    switchButton.setEnabled(true);
+                    takePictureButton.setEnabled(true);
+                    videoButton.setEnabled(true);
+                    videoButton.setText(getString(R.string.record_video));
+                }
+            });
+            Toast.makeText(context, "Video STOPPED!", Toast.LENGTH_SHORT).show();
+        }
+    };
+    final CameraSource.VideoErrorCallback cameraSourceVideoErrorCallback = new CameraSource.VideoErrorCallback() {
+        @Override
+        public void onVideoError(String error) {
+            isRecordingVideo = false;
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    switchButton.setEnabled(true);
+                    takePictureButton.setEnabled(true);
+                    videoButton.setEnabled(true);
+                    videoButton.setText(getString(R.string.record_video));
+                }
+            });
+            Toast.makeText(context, "Video Error: "+error, Toast.LENGTH_LONG).show();
+        }
+    };
+    final Camera2Source.VideoStartCallback camera2SourceVideoStartCallback = new Camera2Source.VideoStartCallback() {
+        @Override
+        public void onVideoStart() {
+            isRecordingVideo = true;
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    videoButton.setEnabled(true);
+                    videoButton.setText(getString(R.string.stop_video));
+                }
+            });
+            Toast.makeText(context, "Video STARTED!", Toast.LENGTH_SHORT).show();
+        }
+    };
+    final Camera2Source.VideoStopCallback camera2SourceVideoStopCallback = new Camera2Source.VideoStopCallback() {
+        @Override
+        public void onVideoStop(String videoFile) {
+            isRecordingVideo = false;
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    switchButton.setEnabled(true);
+                    takePictureButton.setEnabled(true);
+                    videoButton.setEnabled(true);
+                    videoButton.setText(getString(R.string.record_video));
+                }
+            });
+            Toast.makeText(context, "Video STOPPED!", Toast.LENGTH_SHORT).show();
+        }
+    };
+    final Camera2Source.VideoErrorCallback camera2SourceVideoErrorCallback = new Camera2Source.VideoErrorCallback() {
+        @Override
+        public void onVideoError(String error) {
+            isRecordingVideo = false;
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    switchButton.setEnabled(true);
+                    takePictureButton.setEnabled(true);
+                    videoButton.setEnabled(true);
+                    videoButton.setText(getString(R.string.record_video));
+                }
+            });
+            Toast.makeText(context, "Video Error: "+error, Toast.LENGTH_LONG).show();
+        }
+    };
 
     final Camera2Source.ShutterCallback camera2SourceShutterCallback = new Camera2Source.ShutterCallback() {
         @TargetApi(Build.VERSION_CODES.LOLLIPOP)
@@ -151,6 +281,14 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onPictureTaken(Image image) {
             Log.d(TAG, "Taken picture is here!");
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    switchButton.setEnabled(true);
+                    videoButton.setEnabled(true);
+                    takePictureButton.setEnabled(true);
+                }
+            });
             ByteBuffer buffer = image.getPlanes()[0].getBuffer();
             byte[] bytes = new byte[buffer.capacity()];
             buffer.get(bytes);

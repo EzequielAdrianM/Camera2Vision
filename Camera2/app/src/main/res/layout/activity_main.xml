@@ -26,6 +26,11 @@
             android:layout_height="wrap_content"
             android:text="@string/take_picture" />
         <Button
+            android:id="@+id/btn_video"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/record_video"/>
+        <Button
             android:id="@+id/btn_switch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"

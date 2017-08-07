@@ -2,4 +2,6 @@
     <string name="app_name">CAMERA2</string>
     <string name="take_picture">PICTURE</string>
     <string name="switch_camera">SWITCH</string>
+    <string name="record_video">VIDEO</string>
+    <string name="stop_video">STOP</string>
 </resources>
