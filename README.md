@@ -2,7 +2,7 @@
 
 This sample will let you use the basic functionalities of both Camera1 API and Camera2 API, but with a Google Vision Face Detector added.
 You will get all the power of Google Vision Services on your Camera1/Camera2 application.
-You can also switch between Front and Back cameras!
+You can switch between Front and Back cameras, take pictures and record video!
 
 ## Pre-requisites
 
