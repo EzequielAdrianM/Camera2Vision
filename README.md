@@ -23,6 +23,7 @@ Tested and working on:
 * Samsung Galaxy S5 Mini (API Level: 23)
 * Motorola G2 XT1072 (API Level: 23)
 * Samsung Galaxy Core (API Level: 18)
+* Pixel (API Level: 25)
 
 Please let me know if you test with success on your devices so I can update this list.
 
