@@ -1,7 +1,15 @@
 <resources>
-    <string name="app_name">CAMERA2</string>
+    <string name="app_name">CAMERA2VISION</string>
     <string name="take_picture">PICTURE</string>
     <string name="switch_camera">SWITCH</string>
     <string name="record_video">VIDEO</string>
     <string name="stop_video">STOP</string>
+    <string name="flash">FLASH</string>
+    <string name="ok">OK</string>
+    <string name="cameraError">Camera Error</string>
+    <string name="errorCode">Error Code:</string>
+    <string name="cameraOne">Camera 1 API</string>
+    <string name="cameraTwo">Camera 2 API</string>
+    <string name="author">By @EzequielAdrianM</string>
+    <string name="status">status</string>
 </resources>

@@ -6,52 +6,81 @@
     android:orientation="horizontal"
     android:fitsSystemWindows="false">
 
-    <com.example.ezequiel.camera2.others.CameraSourcePreview
-        android:id="@+id/preview"
+    <com.randolabs.ezequiel.camera2.camera.CameraSourcePreview
+        android:id="@+id/mPreview"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
-        <com.example.ezequiel.camera2.others.GraphicOverlay
-            android:id="@+id/faceOverlay"
+        <com.randolabs.ezequiel.camera2.camera.GraphicOverlay
+            android:id="@+id/mGraphicOverlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
-    </com.example.ezequiel.camera2.others.CameraSourcePreview>
+    </com.randolabs.ezequiel.camera2.camera.CameraSourcePreview>
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:layout_marginTop="5dp"
+        android:orientation="horizontal"
+        android:gravity="center_horizontal">
         <Button
-            android:id="@+id/btn_takepicture"
+            android:id="@+id/takePictureButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/take_picture" />
         <Button
-            android:id="@+id/btn_video"
+            android:id="@+id/videoButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/record_video"/>
         <Button
-            android:id="@+id/btn_switch"
+            android:id="@+id/switchButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/switch_camera"/>
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="end|center_vertical">
-            <TextView
-                android:id="@+id/cameraVersion"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="10dp"
-                android:layout_marginRight="10dp"
-                android:text="Camera 1"
-                android:textSize="18sp"
-                android:textColor="@android:color/white"
-                android:background="@android:color/black"/>
-        </LinearLayout>
+        <Button
+            android:id="@+id/flashButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/flash"/>
     </LinearLayout>
+
+    <TextView
+        android:id="@+id/cameraVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginBottom="10dp"
+        android:layout_marginLeft="10dp"
+        android:text="@string/cameraOne"
+        android:textSize="18sp"
+        android:textColor="@android:color/white"
+        android:background="@android:color/black"
+        android:layout_marginStart="10dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_marginBottom="10dp"
+        android:layout_marginRight="10dp"
+        android:text="@string/author"
+        android:textSize="18sp"
+        android:textColor="@android:color/white"
+        android:background="@android:color/black"
+        android:layout_marginEnd="10dp" />
+
+    <TextView
+        android:id="@+id/status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginBottom="40dp"
+        android:layout_marginStart="10dp"
+        android:text="@string/status"
+        android:textSize="18sp"
+        android:textColor="@android:color/white"
+        android:background="@android:color/black"
+        android:layout_marginLeft="10dp" />
 
     <ImageView
         android:id="@+id/ivAutoFocus"
