@@ -14,7 +14,7 @@ You can switch between Front and Back cameras, enable flash, take pictures and r
 * Stability improvements.
 * Added (missing) Auto Exposure, White Balance and Scene Mode AUTO on Camera1 API.
 * Fixed critical bug at Camera2 cameraId LENS_FACING selection.
-* NEW: Test App coming soon. No ads.
+* NEW: Test App: https://play.google.com/store/apps/details?id=com.randolabs.ezequiel.camera2
 
 ## License
 
